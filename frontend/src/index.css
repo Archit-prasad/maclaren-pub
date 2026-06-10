@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@keyframes pubFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes flickerGlow {
+  0%   { filter: brightness(1); }
+  20%  { filter: brightness(1.6); }
+  40%  { filter: brightness(1.1); }
+  60%  { filter: brightness(1.7); }
+  80%  { filter: brightness(1.2); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes swayLights {
+  0%, 100% { transform: rotate(-2deg) translateX(-2px); }
+  50%       { transform: rotate(2deg) translateX(2px); }
+}
+
+@keyframes cloudDrift {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+@keyframes spinFallAway {
+  0%   { opacity: 1; transform: rotateY(0deg) scale(1); }
+  100% { opacity: 0; transform: rotateY(720deg) scale(0); }
+}
+
+@keyframes avatarResolve {
+  0%   { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.pub-bg-animate  { animation: pubFadeIn 1.2s ease-out forwards; }
+.card-slide-up   { animation: cardSlideUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.3s both; }
+.flicker-glow    { animation: flickerGlow 0.7s ease-in-out; }
+.sway-lights     { animation: swayLights 4s ease-in-out infinite; }
+.cloud-drift     { animation: cloudDrift 60s linear infinite; }
+.spin-fall       { animation: spinFallAway 0.5s ease-in forwards; }
+.avatar-resolve  { animation: avatarResolve 0.6s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+.floating-label-group { position: relative; }
+.floating-label-group input:focus + label,
+.floating-label-group input:not(:placeholder-shown) + label {
+  transform: translateY(-1.5rem) scale(0.75);
+  color: #86efac;
+}
+.floating-label-group label {
+  transition: transform 0.2s ease, color 0.2s ease;
+  transform-origin: left top;
+}
+
+.glass-card {
+  background: rgba(10, 25, 15, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.input-glow:focus {
+  outline: none;
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74,222,128,0.25);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
