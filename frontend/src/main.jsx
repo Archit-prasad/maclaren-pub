@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import LoginPage from './pages/LoginPage';
 import PubPage from './pages/PubPage';
+import BoardroomPage from './pages/BoardroomPage';
 import NotFound from './pages/NotFound';
 import CoordinateEditor from './pages/CoordinateEditor';
 
@@ -18,6 +19,7 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/pub" element={<PubPage />} />
+            <Route path="/boardroom" element={<BoardroomPage />} />
             <Route path="/404" element={<NotFound />} />
             {import.meta.env.DEV && (
               <Route path="/dev/coordinate-editor" element={<CoordinateEditor />} />

@@ -1,7 +1,7 @@
 const hotspots = [
   {
     "id": "1781084173292",
-    "name": "Red sofa near entrance (bottom)",
+    "name": "Queue Sofa",
     "type": "Waiting Sofa",
     "x": 58.45,
     "y": 11.04,
@@ -10,7 +10,7 @@ const hotspots = [
   },
   {
     "id": "1781084240668",
-    "name": "Big red circular sofa (top left area)",
+    "name": "Big red circular sofa",
     "type": "Big Corner Sofa",
     "x": 32.05,
     "y": 25.14,
@@ -19,7 +19,7 @@ const hotspots = [
   },
   {
     "id": "1781084306006",
-    "name": "1st red standard sofas around the pub",
+    "name": "1st red standard",
     "type": "Standard Sofa",
     "x": 44.37,
     "y": 25.01,
@@ -28,7 +28,7 @@ const hotspots = [
   },
   {
     "id": "1781084330088",
-    "name": "2nd red standard sofas around the pub",
+    "name": "2nd red standard",
     "type": "Standard Sofa",
     "x": 31.97,
     "y": 42.24,
@@ -37,7 +37,7 @@ const hotspots = [
   },
   {
     "id": "1781084353902",
-    "name": "3rd red standard sofas around the pub",
+    "name": "3rd red standard sofas",
     "type": "Standard Sofa",
     "x": 47.74,
     "y": 61.96,
@@ -46,7 +46,7 @@ const hotspots = [
   },
   {
     "id": "1781084373964",
-    "name": "4th red standard sofas around the pub",
+    "name": "4th red standard sofas",
     "type": "Standard Sofa",
     "x": 39.47,
     "y": 62.33,
@@ -55,7 +55,7 @@ const hotspots = [
   },
   {
     "id": "1781084445791",
-    "name": "Long table with many chairs (top)",
+    "name": "Long table with many chairs",
     "type": "Long Table A",
     "x": 61.74,
     "y": 29.38,
@@ -127,7 +127,7 @@ const hotspots = [
   },
   {
     "id": "1781084754198",
-    "name": "Left washroom (top left)",
+    "name": "Men's Washroom",
     "type": "Men's Washroom",
     "x": 5.23,
     "y": 47.36,
@@ -136,7 +136,7 @@ const hotspots = [
   },
   {
     "id": "1781084781690",
-    "name": "Right washroom",
+    "name": "Women's Washroom",
     "type": "Women's Washroom",
     "x": 15.18,
     "y": 39.37,
@@ -145,7 +145,7 @@ const hotspots = [
   },
   {
     "id": "1781084830522",
-    "name": "Bar counter (brown wooden counter)",
+    "name": "Bar counter",
     "type": "Bar Counter",
     "x": 67.14,
     "y": 24.89,
@@ -154,7 +154,7 @@ const hotspots = [
   },
   {
     "id": "1781084860405",
-    "name": "Jukebox (yellow box near bar)",
+    "name": "Jukebox",
     "type": "Jukebox",
     "x": 26.99,
     "y": 66.83,

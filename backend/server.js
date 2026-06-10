@@ -9,12 +9,14 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
 const coinsRoutes = require('./routes/coins');
+const createAdminRouter = require('./routes/admin');
 const Message = require('./models/Message');
 const Table = require('./models/Table');
 const User = require('./models/User');
 const { ITEM_MAP } = require('./data/barMenuData');
 const registerPhase4 = require('./sockets/phase4');
 const { checkMurtaugh, trackDailySpend } = require('./sockets/phase4');
+const { loadKeywords, censorText } = require('./middleware/grinchFilter');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -35,6 +37,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/coins', coinsRoutes);
+// Admin router is mounted after io is created so it can receive the io reference
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 // ─── Capacity matrix ─────────────────────────────────────────────────────────
@@ -47,6 +50,7 @@ const CAPACITY = {
 
 // ─── Shared in-memory state ───────────────────────────────────────────────────
 const state = {
+  bfhStats: { total: 0, accepted: 0, declined: 0, refunded: 0 },
   rooms:              new Map(), // table_id → { users: Map<socketId, info>, type }
   socketTable:        new Map(), // socketId → table_id
   lastActivity:       new Map(), // socketId → timestamp
@@ -193,6 +197,8 @@ io.on('connection', (socket) => {
   userSocketMap.set(String(socket.user.user_id), socket.id);
   state.sessionBeerCount.set(socket.id, 0);
   socket.join('pub_general');
+  if (socket.user.is_admin) socket.join('admin_feed');
+  io.to('admin_feed').emit('admin:user_connected', { display_name: socket.user.display_name, total_online: userSocketMap.size });
   console.log(`+ ${socket.user.display_name}`);
 
   // Register Phase 4 events
@@ -345,10 +351,12 @@ io.on('connection', (socket) => {
         return callback?.({ error: 'Banned by Carl.' });
       }
     }
+    // Apply Grinch Filter (censor banned keywords)
+    const cleanContent = type === 'text' ? censorText(content?.trim() ?? '') : (content?.trim() ?? '');
     const message = await Message.create({
       table_id, user_id: socket.user.user_id,
       display_name: socket.user.display_name, avatar_url: socket.user.avatar_url ?? '',
-      content: content?.trim() ?? '', image_url: image_url ?? '', type,
+      content: cleanContent, image_url: image_url ?? '', type,
     });
     io.to(table_id).emit('chat:message', message.toObject());
     callback?.({ success: true, message_id: message._id });
@@ -438,6 +446,7 @@ io.on('connection', (socket) => {
         sandwichTimers.set(uid, setTimeout(() => { sandwichTimers.delete(uid); userStatuses.set(socket.id, 'active'); emitStatusChanged(socket, 'active', table_id); }, 600_000));
       }
 
+      io.to('admin_feed').emit('admin:transaction', { display_name: socket.user.display_name, description: `Purchased ${qty}x ${item.name}`, amount: -totalCost, timestamp: new Date() });
       callback?.({ success: true, gnb_coin_balance: user.gnb_coin_balance, personal_inventory: user.personal_inventory, session_spend_total: user.session_spend_total, transaction_ledger: user.transaction_ledger, item });
     } catch (err) {
       console.error('bar:purchase', err);
@@ -550,8 +559,12 @@ io.on('connection', (socket) => {
 
 // ─── MongoDB + start ──────────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log('MongoDB connected');
+    // Mount admin router (needs io reference) and load keyword cache
+    app.use('/api/admin', createAdminRouter(state, io));
+    await loadKeywords();
+    console.log('Grinch filter loaded');
     const PORT = process.env.PORT || 3000;
     httpServer.listen(PORT, () => console.log(`Server on :${PORT}`));
   })

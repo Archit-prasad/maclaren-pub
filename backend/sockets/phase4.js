@@ -137,6 +137,8 @@ module.exports = function registerPhase4Events(socket, io, state) {
         }
       }
 
+      if (state.bfhStats) state.bfhStats.total++;
+      io.to('admin_feed').emit('admin:bfh_event', { type: 'initiated', sender: socket.user.display_name, recipient: recipient.display_name });
       callback({ success: true, gnb_coin_balance: sender.gnb_coin_balance });
     } catch (err) {
       console.error('bfh:initiate', err);
@@ -179,10 +181,14 @@ module.exports = function registerPhase4Events(socket, io, state) {
           locked_until: threeDays.toISOString(),
           profile_title: '[Blue french horn reciever]',
         });
+        if (state.bfhStats) state.bfhStats.accepted++;
+        io.to('admin_feed').emit('admin:bfh_event', { type: 'accepted', sender: proposal.senderName, recipient: proposal.recipientName });
         io.to(proposal.senderSocketId).emit('bfh:accepted_notify', { recipient_name: proposal.recipientName });
 
       } else {
         // Declined — zero refund, Murtaugh level 6 for sender
+        if (state.bfhStats) state.bfhStats.declined++;
+        io.to('admin_feed').emit('admin:bfh_event', { type: 'declined', sender: proposal.senderName, recipient: proposal.recipientName });
         await checkMurtaugh(proposal.senderUserId, 'level_6');
         if (table_id) {
           io.to(table_id).emit('chat:message', {

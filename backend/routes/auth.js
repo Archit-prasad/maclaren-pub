@@ -95,7 +95,7 @@ router.post('/login', async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) return res.status(401).json({ message: 'Invalid credentials.' });
-    if (user.is_banned) return res.status(403).json({ message: "Your account has been banned from MacLaren's." });
+    if (user.is_banned) return res.status(403).json({ message: "🚪 Doug the Bouncer threw you out into the alley. Your account has been permanently banned.", banned: true });
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials.' });
@@ -118,6 +118,16 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found.' });
     res.json({ user: userPayload(user) });
   } catch (err) {
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+// POST /api/auth/complete_onboarding — mark first-login tour as done
+router.post('/complete_onboarding', authMiddleware, async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user.user_id, { $set: { is_first_login: false } });
+    res.json({ success: true });
+  } catch {
     res.status(500).json({ message: 'Server error.' });
   }
 });

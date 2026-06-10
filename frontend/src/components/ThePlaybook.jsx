@@ -33,6 +33,8 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
   // Murtaugh progress fetched fresh from server when tab opens
   const [murtaughProgress, setMurtaughProgress] = useState(null);
   const [murtaughLoading, setMurtaughLoading] = useState(false);
+  // Sacred Texts accordion state — keys are section titles
+  const [openSections, setOpenSections] = useState({});
   const animRef = useRef(null);
 
   // Keep displayed balance in sync + count-up animation
@@ -125,7 +127,15 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
 
   if (!isOpen) return null;
 
-  const SECTIONS = ['profile', 'account', 'ledger', 'bros', 'murtaugh'];
+  const SECTIONS = ['profile', 'account', 'ledger', 'bros', 'murtaugh', 'sacred_texts'];
+  const SECTION_LABELS = {
+    profile: '👤 Profile',
+    account: '⚙️ Account',
+    ledger: '📊 Ledger',
+    bros: '🤝 Bros',
+    murtaugh: '👴 Murtaugh',
+    sacred_texts: '📖 Texts',
+  };
 
   return (
     <>
@@ -143,12 +153,12 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
         </div>
 
         {/* Tabs */}
-        <div className="flex px-4 pt-4 gap-1.5">
+        <div className="flex px-4 pt-4 gap-1.5 overflow-x-auto">
           {SECTIONS.map(s => (
             <button key={s} onClick={() => setSection(s)}
-              className="flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors"
+              className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0 min-w-fit"
               style={{ background: section === s ? Gf(0.2) : 'transparent', color: section === s ? G : Gf(0.4), border: section === s ? `1px solid ${Gf(0.35)}` : '1px solid transparent' }}>
-              {s}
+              {SECTION_LABELS[s]}
             </button>
           ))}
         </div>
@@ -330,6 +340,82 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
               </div>
             );
           })()}
+
+          {/* ── Sacred Texts ──────────────────────────────────────────────── */}
+          {section === 'sacred_texts' && <div className="space-y-2">
+            <p className="text-xs uppercase tracking-widest mb-3" style={{ color: Gf(0.5) }}>The Sacred Texts</p>
+            {[
+              {
+                title: '📖 The Bro Code',
+                items: [
+                  '50-Bro capacity limit per user',
+                  'Thumb-lick acceptance process required',
+                  '10% automatic discount on offers from Bros',
+                  'Article 1: BFH blocked if Bro has empty inventory',
+                ],
+              },
+              {
+                title: '🎺 The Grand Gesture (BFH)',
+                items: [
+                  'Costs 2,000 GNB to initiate',
+                  'Requires opposite gender between sender & recipient',
+                  '3-month (90-day) cooldown on recipient after acceptance',
+                  'Zero GNB refund if recipient declines',
+                  '3-day blue theme lock on recipient\'s UI after acceptance',
+                ],
+              },
+              {
+                title: '🌍 Global Environmental Modifiers',
+                items: [
+                  'Nothing Good Happens After 2 AM: 2:00–5:00 AM window applies 20% surcharge to orders over 100 GNB',
+                  'Article 37 Dibs Clause: 60-second seat lock, 7-day cooldown per user',
+                ],
+              },
+              {
+                title: '👴 The Murtaugh List',
+                items: [
+                  'Level 1: Stay idle for 6+ hours',
+                  'Level 2: Consume a Sandwich 3 times',
+                  'Level 3: Buy 6 cheap beers in one session',
+                  'Level 4: Have an offer rejected',
+                  'Level 5: Trigger Cap/Overdraft 3 times',
+                  'Level 6: BFH proposal rejected',
+                  'Level 7: Hoard 4+ items on coaster',
+                  'Level 8: Act as Wingman',
+                  'Level 9: Spend 500+ GNB in one day',
+                  'Level 10: Both succeed and fail Naked Man',
+                  'All 10 complete: Badge [Too Old For This]',
+                ],
+              },
+            ].map((section, i) => {
+              const isOpen = openSections[section.title] ?? (i === 0);
+              return (
+                <button
+                  key={i}
+                  onClick={() => setOpenSections(s => ({ ...s, [section.title]: !s[section.title] }))}
+                  className="w-full text-left px-3 py-2.5 rounded-lg transition-all"
+                  style={{
+                    background: isOpen ? Gf(0.1) : Gf(0.04),
+                    border: `1px solid ${isOpen ? Gf(0.25) : Gf(0.12)}`,
+                  }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold" style={{ color: G }}>{section.title}</span>
+                    <span style={{ color: Gf(0.5) }}>{isOpen ? '▼' : '▶'}</span>
+                  </div>
+                  {isOpen && (
+                    <div className="mt-2.5 space-y-1.5 text-[10px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      {section.items.map((item, j) => (
+                        <div key={j} className="flex gap-2">
+                          <span className="flex-shrink-0">•</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>}
         </div>
 
         {/* Footer */}

@@ -14,6 +14,7 @@ import WingmanModal from '../components/WingmanModal';
 import BFHModal from '../components/BFHModal';
 import BFHBanner from '../components/BFHBanner';
 import BroRequestModal from '../components/BroRequestModal';
+import OnboardingTour from '../components/OnboardingTour';
 
 const WASHROOM_TYPES = new Set(["Men's Washroom", "Women's Washroom"]);
 const THREE_DAYS_MS = 3 * 86400000;
@@ -129,10 +130,21 @@ export default function PubPage() {
   const [nakedManOption, setNakedManOption] = useState(null);     // { table_id, table_type } if naked man available
   const [isShaking, setIsShaking] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
+  const [onboardingActive, setOnboardingActive] = useState(false);
   const shakeRef = useRef(null);
   const freezeRef = useRef(null);
+  const coinBalanceRef = useRef(null);
+  const floorMapRef = useRef(null);
+  const coasterRef = useRef(null);
 
   useEffect(() => { if (!token) navigate('/login', { replace: true }); }, [token]);
+
+  // Trigger onboarding tour on first login
+  useEffect(() => {
+    if (user && user.is_first_login) {
+      setOnboardingActive(true);
+    }
+  }, [user?.is_first_login]);
 
   // BFH theme lock check
   const bfhLocked = user?.bfh_theme_locked_until && Date.now() < new Date(user.bfh_theme_locked_until).getTime();
@@ -384,7 +396,7 @@ export default function PubPage() {
               )}
             </div>
           )}
-          <span className="text-xs hidden sm:block" style={{ color: bfhLocked ? '#6699ff' : 'rgba(251,191,36,0.6)' }}>
+          <span ref={coinBalanceRef} className="text-xs hidden sm:block" style={{ color: bfhLocked ? '#6699ff' : 'rgba(251,191,36,0.6)' }}>
             🪙 {user?.gnb_coin_balance ?? 0}
           </span>
           <span className="text-white/50 text-xs hidden sm:block">{user?.display_name}</span>
@@ -399,9 +411,9 @@ export default function PubPage() {
 
       {/* Desktop */}
       <div className="hidden md:flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-hidden" style={{ borderRight: `1px solid ${bfhLocked ? 'rgba(0,0,255,0.2)' : 'rgba(180,120,40,0.15)'}` }}>{floorMap}</div>
+        <div ref={floorMapRef} className="flex-1 overflow-hidden" style={{ borderRight: `1px solid ${bfhLocked ? 'rgba(0,0,255,0.2)' : 'rgba(180,120,40,0.15)'}` }}>{floorMap}</div>
         <div className="w-[320px] flex-shrink-0 overflow-hidden" style={{ borderRight: `1px solid ${bfhLocked ? 'rgba(0,0,255,0.2)' : 'rgba(180,120,40,0.15)'}` }}>{chatPanel}</div>
-        <div className="w-[200px] flex-shrink-0 overflow-hidden">{coasterPanel}</div>
+        <div ref={coasterRef} className="w-[200px] flex-shrink-0 overflow-hidden">{coasterPanel}</div>
       </div>
 
       {/* Mobile */}
@@ -448,6 +460,14 @@ export default function PubPage() {
       <BroRequestModal request={broRequest} onAccept={acceptBro} onDecline={declineBro} />
       {bfhPanelOpen && <BFHInitiatePanel socket={socket} addToast={addToast} triggerShake={triggerShake} onClose={() => setBfhPanelOpen(false)} />}
       <Toast toasts={toasts} removeToast={removeToast} />
+      <OnboardingTour
+        isActive={onboardingActive}
+        onComplete={() => { setOnboardingActive(false); updateUser({ is_first_login: false }); }}
+        token={token}
+        coinBalanceRef={coinBalanceRef}
+        floorMapRef={floorMapRef}
+        coasterRef={coasterRef}
+      />
     </div>
   );
 }
