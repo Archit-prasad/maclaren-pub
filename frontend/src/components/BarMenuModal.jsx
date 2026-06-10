@@ -69,13 +69,20 @@ function ItemDetailModal({ item, onClose, onPurchaseSuccess, addToast, triggerSh
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  const [nightOwlPending, setNightOwlPending] = useState(false);
   const totalCost = item.price * qty;
   const canAfford = (user?.gnb_coin_balance ?? 0) >= totalCost;
 
-  const purchase = () => {
+  function isNightOwlHour() {
+    const h = new Date().getHours();
+    return h >= 2 && h < 5;
+  }
+
+  const doPurchase = (surcharge = 1) => {
     if (!socket || loading) return;
     setLoading(true);
-    socket.emit('bar:purchase', { item_id: item.id, quantity: qty }, (res) => {
+    const effectiveCost = Math.ceil(totalCost * surcharge);
+    socket.emit('bar:purchase', { item_id: item.id, quantity: qty, night_owl_surcharge: surcharge > 1 }, (res) => {
       setLoading(false);
       if (res.error === 'artillery_arthur') {
         addToast(res.message, 'error');
@@ -103,6 +110,35 @@ function ItemDetailModal({ item, onClose, onPurchaseSuccess, addToast, triggerSh
       onClose();
     });
   };
+
+  const purchase = () => {
+    if (!socket || loading) return;
+    // Nothing Good Happens After 2 AM
+    if (isNightOwlHour() && totalCost > 100) {
+      setNightOwlPending(true);
+      return;
+    }
+    doPurchase(1);
+  };
+
+  if (nightOwlPending) {
+    return (
+      <div className="fixed inset-0 z-[75] flex flex-col items-center justify-center bg-black/95">
+        <p className="text-white font-black text-3xl mb-3 text-center px-8">Nothing good happens after 2 AM.</p>
+        <p className="text-white/50 text-sm mb-8 text-center">Go to sleep, Schmosby.</p>
+        <div className="flex gap-4">
+          <button onClick={() => { setNightOwlPending(false); onClose(); }}
+            className="px-6 py-3 bg-blue-800 hover:bg-blue-700 rounded-xl text-white font-semibold transition-colors">
+            Go To Sleep (Exit)
+          </button>
+          <button onClick={() => { setNightOwlPending(false); doPurchase(1.2); }}
+            className="px-6 py-3 bg-red-800 hover:bg-red-700 rounded-xl text-white font-semibold transition-colors">
+            I Don't Care, Let's Make a Mistake (+20% surcharge)
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>

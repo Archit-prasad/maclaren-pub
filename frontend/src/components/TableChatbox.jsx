@@ -14,7 +14,7 @@ function polaroidTilt(id) {
 }
 
 // ─── AvatarMenu ───────────────────────────────────────────────────────────────
-function AvatarMenu({ user, isMuted, onMute, onIntervention, onClose }) {
+function AvatarMenu({ user, isMuted, onMute, onIntervention, onBroRequest, onClose }) {
   return (
     <div className="absolute top-10 left-0 z-20 bg-[#1a1208] border border-amber-900/40 rounded-xl shadow-2xl p-2 min-w-[170px]" onClick={(e) => e.stopPropagation()}>
       <p className="text-amber-400/70 text-xs px-2 py-1 border-b border-amber-900/30 mb-1 truncate">{user.display_name}</p>
@@ -25,6 +25,13 @@ function AvatarMenu({ user, isMuted, onMute, onIntervention, onClose }) {
         <span className="text-lg">🥽</span>
         {isMuted ? 'Remove Sensory Deprivator' : 'Equip Sensory Deprivator'}
       </button>
+      {onBroRequest && (
+        <button onClick={() => { onBroRequest(user.user_id); onClose(); }}
+          className="w-full text-left px-3 py-2 rounded-lg text-xs text-white/80 hover:bg-white/5 flex items-center gap-2">
+          <span className="text-lg">🤝</span>
+          Send Bro Request
+        </button>
+      )}
       <button
         onClick={() => { onIntervention(); onClose(); }}
         className="w-full text-left px-3 py-2 rounded-lg text-xs text-white/80 hover:bg-white/5 flex items-center gap-2"
@@ -97,7 +104,7 @@ function MessageBubble({ msg, isOwn, isMuted, onDoubleClick, slapBet }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function TableChatbox({ table, onLeave, addToast, userStatuses = new Map() }) {
+export default function TableChatbox({ table, onLeave, addToast, userStatuses = new Map(), onNakedManAvailable, wingmanAvailableProposal, onActWingman }) {
   const { socket } = useSocket();
   const { user, token } = useAuth();
 
@@ -129,8 +136,13 @@ export default function TableChatbox({ table, onLeave, addToast, userStatuses = 
       table_id: table.id,
       table_type: table.type,
       table_name: table.name,
-    }, ({ success, error, history, users }) => {
-      if (error) { addToast?.(error, 'error'); onLeave?.(); return; }
+    }, ({ success, error, naked_man_available, history, users }) => {
+      if (error) {
+        if (naked_man_available) { onNakedManAvailable?.(table); }
+        else addToast?.(error, 'error');
+        onLeave?.();
+        return;
+      }
       setMessages(history ?? []);
       setRoomUsers(users ?? []);
       setHasOlderMessages((history ?? []).length === 50);
@@ -375,23 +387,25 @@ export default function TableChatbox({ table, onLeave, addToast, userStatuses = 
           <AvatarMenu
             user={avatarMenu}
             isMuted={mutedUsers.has(avatarMenu.user_id)}
-            onMute={() => setMutedUsers((s) => {
-              const n = new Set(s);
-              n.has(avatarMenu.user_id) ? n.delete(avatarMenu.user_id) : n.add(avatarMenu.user_id);
-              return n;
-            })}
+            onMute={() => setMutedUsers((s) => { const n = new Set(s); n.has(avatarMenu.user_id) ? n.delete(avatarMenu.user_id) : n.add(avatarMenu.user_id); return n; })}
             onIntervention={triggerIntervention}
+            onBroRequest={onBroRequest}
             onClose={() => setAvatarMenu(null)}
           />
         )}
 
-        {/* Leave button */}
-        <button
-          onClick={onLeave}
-          className="text-xs text-red-400/60 hover:text-red-400 transition-colors ml-1 flex-shrink-0"
-        >
-          Leave
-        </button>
+        {/* Dibs + Leave */}
+        <div className="flex gap-1 items-center flex-shrink-0">
+          <button
+            onClick={() => socket?.emit('dibs:declare', { table_id: table.id }, (res) => { if (res.error) addToast?.(res.error, 'warn'); else addToast?.('🪑 Dibs declared!', 'success'); })}
+            className="text-xs px-1.5 py-0.5 rounded transition-colors"
+            style={{ color: 'rgba(212,168,67,0.5)', border: '1px solid rgba(212,168,67,0.2)' }}
+            title="Declare Dibs on a seat"
+          >
+            Dibs
+          </button>
+          <button onClick={onLeave} className="text-xs text-red-400/60 hover:text-red-400 transition-colors">Leave</button>
+        </div>
       </div>
 
       {/* ── Messages ───────────────────────────────────────────────────────── */}

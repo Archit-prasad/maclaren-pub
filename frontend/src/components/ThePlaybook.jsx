@@ -5,12 +5,34 @@ import { useAuth } from '../contexts/AuthContext';
 const G = '#d4a843';
 const Gf = (o) => `rgba(212,168,67,${o})`;
 
+// Ordered level entries — explicit order guarantees level_1 through level_10 always render
+const MURTAUGH_LEVELS = [
+  { key: 'level_1',  label: 'Stay idle for more than 6 hours.' },
+  { key: 'level_2',  label: "Consume a 'Sandwich' from inventory 3 separate times." },
+  { key: 'level_3',  label: 'Buy 6 cheap beers in a single session.' },
+  { key: 'level_4',  label: 'Have a personal drink offer rejected by another user (Lawyered!).' },
+  { key: 'level_5',  label: 'Trigger the 6-drink Personal Cap Rule OR Overdraft penalty 3 times.' },
+  { key: 'level_6',  label: 'Get rejected for offering the Blue French Horn.' },
+  { key: 'level_7',  label: 'Hoard 4+ items simultaneously on the drink coaster.' },
+  { key: 'level_8',  label: "Use 'Act as Wingman' to support a bro." },
+  { key: 'level_9',  label: 'Cumulative spending over 500 GNB in a single calendar day.' },
+  { key: 'level_10', label: 'Fail AND succeed the Naked Man protocol at least once each.' },
+];
+
+const DEFAULT_MURTAUGH = {
+  level_1: false, level_2: false, level_3: false, level_4: false, level_5: false,
+  level_6: false, level_7: false, level_8: false, level_9: false, level_10: false,
+};
+
 export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake }) {
   const { user, token, logout, updateUser } = useAuth();
   const [section, setSection] = useState('profile');
   const [ledger, setLedger] = useState([]);
   const [claiming, setClaiming] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(user?.gnb_coin_balance ?? 0);
+  // Murtaugh progress fetched fresh from server when tab opens
+  const [murtaughProgress, setMurtaughProgress] = useState(null);
+  const [murtaughLoading, setMurtaughLoading] = useState(false);
   const animRef = useRef(null);
 
   // Keep displayed balance in sync + count-up animation
@@ -36,6 +58,25 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
     axios.get('/api/coins/ledger', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { setLedger(r.data.transaction_ledger ?? []); updateUser({ gnb_coin_balance: r.data.gnb_coin_balance, session_spend_total: r.data.session_spend_total }); })
       .catch(() => {});
+  }, [section, token]);
+
+  // Fetch fresh murtaugh progress from server when tab opens
+  useEffect(() => {
+    if (section !== 'murtaugh' || !token) return;
+    setMurtaughLoading(true);
+    axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => {
+        const progress = r.data.user?.murtaugh_list_progress;
+        if (progress && typeof progress === 'object') {
+          setMurtaughProgress({ ...DEFAULT_MURTAUGH, ...progress });
+        }
+        // Also sync profile_title in case it changed
+        if (r.data.user?.profile_title !== undefined) {
+          updateUser({ profile_title: r.data.user.profile_title, murtaugh_list_progress: r.data.user.murtaugh_list_progress });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setMurtaughLoading(false));
   }, [section, token]);
 
   const claim = async () => {
@@ -84,7 +125,7 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
 
   if (!isOpen) return null;
 
-  const SECTIONS = ['profile', 'account', 'ledger'];
+  const SECTIONS = ['profile', 'account', 'ledger', 'bros', 'murtaugh'];
 
   return (
     <>
@@ -211,6 +252,84 @@ export default function ThePlaybook({ isOpen, onClose, addToast, triggerShake })
               Goliath National Bank: We care about... your money.
             </p>
           </>}
+
+          {/* ── Bro Registry ──────────────────────────────────────────── */}
+          {section === 'bros' && <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-widest" style={{ color: Gf(0.5) }}>Bro Registry</p>
+              <span className="text-xs font-bold" style={{ color: G }}>{user?.bro_registry?.length ?? 0} / 50</span>
+            </div>
+            {(user?.bro_registry?.length ?? 0) === 0 && (
+              <p className="text-white/20 text-xs text-center py-4 italic">No Bros yet. Go to a table and send a Bro Request!</p>
+            )}
+            <div className="space-y-2">
+              {(user?.bro_registry ?? []).map((id, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: Gf(0.05), border: `1px solid ${Gf(0.12)}` }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: Gf(0.15), color: G }}>🤝</div>
+                  <span className="text-white/70 text-xs truncate">{String(id).slice(-8)}</span>
+                  <span className="text-white/30 text-[9px] ml-auto">10% discount on offers</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs pt-2" style={{ color: Gf(0.3) }}>Bros get a 10% discount when you offer them drinks from your coaster. Bros Before Hoes — Article 1.</p>
+          </div>}
+
+          {/* ── Murtaugh List ─────────────────────────────────────────── */}
+          {section === 'murtaugh' && (() => {
+            // Resolution order: server-fetched → user context → hardcoded default
+            const progress = murtaughProgress
+              ?? (user?.murtaugh_list_progress && typeof user.murtaugh_list_progress === 'object' && Object.keys(user.murtaugh_list_progress).length > 0
+                  ? { ...DEFAULT_MURTAUGH, ...user.murtaugh_list_progress }
+                  : DEFAULT_MURTAUGH);
+            const allDone = MURTAUGH_LEVELS.every(({ key }) => progress[key] === true);
+            const completedCount = MURTAUGH_LEVELS.filter(({ key }) => progress[key] === true).length;
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs uppercase tracking-widest" style={{ color: Gf(0.5) }}>The Murtaugh List</p>
+                  <span className="text-xs font-bold" style={{ color: allDone ? '#FFD700' : Gf(0.6) }}>
+                    {completedCount} / 10
+                  </span>
+                </div>
+
+                {murtaughLoading && (
+                  <p className="text-white/30 text-xs text-center py-2">Loading...</p>
+                )}
+
+                {allDone && (
+                  <div className="px-3 py-2 rounded-xl text-xs text-center font-bold mb-2"
+                    style={{ background: 'rgba(255,215,0,0.15)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.4)' }}>
+                    🏆 [Too Old For This] — All 10 complete!
+                  </div>
+                )}
+
+                {MURTAUGH_LEVELS.map(({ key, label }, i) => {
+                  const done = progress[key] === true;
+                  return (
+                    <div key={key}
+                      className="flex items-start gap-3 px-3 py-2.5 rounded-lg"
+                      style={{
+                        background: done ? 'rgba(34,197,94,0.08)' : Gf(0.04),
+                        border: `1px solid ${done ? 'rgba(34,197,94,0.25)' : Gf(0.1)}`,
+                      }}
+                    >
+                      <span className="text-base flex-shrink-0 mt-0.5">{done ? '✅' : '⬜'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold mb-0.5"
+                          style={{ color: done ? '#86efac' : 'rgba(255,255,255,0.7)' }}>
+                          Level {i + 1}
+                        </p>
+                        <p className="text-[10px] leading-snug"
+                          style={{ color: done ? 'rgba(134,239,172,0.8)' : 'rgba(255,255,255,0.4)' }}>
+                          {label}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer */}
