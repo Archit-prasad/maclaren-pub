@@ -8,7 +8,7 @@ const CHAT_TYPES = new Set([
 ]);
 
 // room occupancy count overlay (populated by parent via roomCounts prop)
-export default function PubFloorMap({ onHotspotClick, roomCounts = {}, activeTableId = null, addToast }) {
+export default function PubFloorMap({ onHotspotClick, roomCounts = {}, activeTableId = null, addToast, onBarOpen }) {
   const { user } = useAuth();
   const imgRef = useRef(null);
   const containerRef = useRef(null);
@@ -106,7 +106,7 @@ export default function PubFloorMap({ onHotspotClick, roomCounts = {}, activeTab
     }
 
     if (hotspot.type === 'Bar Counter') {
-      addToast?.('🍺 Bar menu coming in Phase 3!');
+      onBarOpen?.();
       return;
     }
 

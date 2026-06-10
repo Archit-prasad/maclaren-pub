@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -6,14 +6,16 @@ import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
 import PubFloorMap from '../components/PubFloorMap';
 import TableChatbox from '../components/TableChatbox';
-import CoasterPlaceholder from '../components/CoasterPlaceholder';
+import DrinkCoaster from '../components/DrinkCoaster';
 import EntryModal from '../components/EntryModal';
 import ThePlaybook from '../components/ThePlaybook';
+import BarMenuModal from '../components/BarMenuModal';
+import WingmanModal from '../components/WingmanModal';
 
 const WASHROOM_TYPES = new Set(["Men's Washroom", "Women's Washroom"]);
 
-// ── Public (General) Chat using pub_general room ──────────────────────────────
-function GeneralChat({ socket, user }) {
+// ── Public (General) Bar Chat ─────────────────────────────────────────────────
+function GeneralChat({ socket }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const endRef = useRef(null);
@@ -21,11 +23,9 @@ function GeneralChat({ socket, user }) {
   useEffect(() => {
     if (!socket) return;
     socket.emit('pub:enter');
-    const onMsg = (msg) => setMessages((m) => [...m.slice(-200), msg]);
-    socket.on('chat:message', (msg) => {
-      if (msg.table_id === 'pub_general') onMsg(msg);
-    });
-    return () => socket.off('chat:message');
+    const onMsg = (msg) => { if (msg.table_id === 'pub_general') setMessages(m => [...m.slice(-200), msg]); };
+    socket.on('chat:message', onMsg);
+    return () => socket.off('chat:message', onMsg);
   }, [socket]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -43,9 +43,7 @@ function GeneralChat({ socket, user }) {
         <p className="text-amber-400/70 text-xs font-semibold tracking-widest uppercase">MacLaren's Bar</p>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
-        {messages.length === 0 && (
-          <p className="text-white/15 text-xs text-center pt-4 italic">The bar is quiet... for now.</p>
-        )}
+        {messages.length === 0 && <p className="text-white/15 text-xs text-center pt-4 italic">The bar is quiet... for now.</p>}
         {messages.map((msg, i) => (
           <div key={msg._id ?? i} className="flex gap-2 items-start">
             <span className="text-amber-600/70 text-[10px] font-semibold flex-shrink-0 mt-0.5">{msg.display_name}</span>
@@ -55,21 +53,12 @@ function GeneralChat({ socket, user }) {
         <div ref={endRef} />
       </div>
       <div className="px-3 py-2 flex gap-2 flex-shrink-0" style={{ borderTop: '1px solid rgba(180,120,40,0.15)' }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="Shout across the bar..."
-          className="flex-1 bg-[#1a1208] border border-amber-900/25 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/20 outline-none"
-        />
-        <button
-          onClick={send}
-          disabled={!input.trim()}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-30 transition-colors"
-          style={{ background: '#FFD800', color: '#000' }}
-        >
-          Send
-        </button>
+          className="flex-1 bg-[#1a1208] border border-amber-900/25 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/20 outline-none" />
+        <button onClick={send} disabled={!input.trim()}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-30"
+          style={{ background: '#FFD800', color: '#000' }}>Send</button>
       </div>
     </div>
   );
@@ -77,214 +66,185 @@ function GeneralChat({ socket, user }) {
 
 // ─── PubPage ──────────────────────────────────────────────────────────────────
 export default function PubPage() {
-  const { user, token } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const { socket, connected } = useSocket();
   const navigate = useNavigate();
   const { toasts, addToast, removeToast } = useToast();
 
   const [pendingHotspot, setPendingHotspot] = useState(null);
   const [activeTable, setActiveTable] = useState(null);
+  const [roomUsers, setRoomUsers] = useState([]);  // users at current table (for coaster offer list)
   const [roomCounts, setRoomCounts] = useState({});
   const [playbookOpen, setPlaybookOpen] = useState(false);
+  const [barMenuOpen, setBarMenuOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat');
-  // 'active' | 'idle' | 'waiting' | 'eating_sandwich'
   const [myStatus, setMyStatus] = useState('active');
-  // userId(string) → { display_name, status }
   const [userStatuses, setUserStatuses] = useState(new Map());
+  const [pendingOffer, setPendingOffer] = useState(null); // incoming wingman offer
+  const [isShaking, setIsShaking] = useState(false);
+  const [isFrozen, setIsFrozen] = useState(false);   // intervention freeze
+  const shakeTimerRef = useRef(null);
+  const freezeTimerRef = useRef(null);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!token) navigate('/login', { replace: true });
-  }, [token]);
+  useEffect(() => { if (!token) navigate('/login', { replace: true }); }, [token]);
 
-  // Listen for status changes from the server
+  // ── Screen shake ───────────────────────────────────────────────────────────
+  const triggerShake = useCallback(() => {
+    setIsShaking(true);
+    clearTimeout(shakeTimerRef.current);
+    shakeTimerRef.current = setTimeout(() => setIsShaking(false), 600);
+  }, []);
+
+  // ── Intervention freeze ────────────────────────────────────────────────────
+  const triggerFreeze = useCallback(() => {
+    setIsFrozen(true);
+    addToast('🔴 INTERVENTION! Step away from the bar!', 'error');
+    clearTimeout(freezeTimerRef.current);
+    freezeTimerRef.current = setTimeout(() => setIsFrozen(false), 3000);
+  }, []);
+
+  // ── Socket listeners ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
+
     const onStatusChanged = ({ user_id, display_name, status, self }) => {
-      if (self) {
-        setMyStatus(status);
-      } else {
-        setUserStatuses((prev) => {
-          const next = new Map(prev);
-          next.set(String(user_id), { display_name, status });
-          return next;
-        });
-      }
+      if (self) setMyStatus(status);
+      else setUserStatuses(prev => { const n = new Map(prev); n.set(String(user_id), { display_name, status }); return n; });
     };
+    const onOfferIncoming = (offer) => setPendingOffer(offer);
+    const onOfferCancelled = ({ message }) => { setPendingOffer(null); addToast(message, 'warn'); };
+    const onInterventionFreeze = () => triggerFreeze();
+    const onUserJoined = ({ users }) => setRoomUsers(users ?? []);
+    const onUserLeft = ({ users }) => setRoomUsers(users ?? []);
+
     socket.on('user:status_changed', onStatusChanged);
-    return () => socket.off('user:status_changed', onStatusChanged);
+    socket.on('drink:offer_incoming', onOfferIncoming);
+    socket.on('drink:offer_cancelled', onOfferCancelled);
+    socket.on('intervention:freeze', onInterventionFreeze);
+    socket.on('room:user_joined', onUserJoined);
+    socket.on('room:user_left', onUserLeft);
+
+    return () => {
+      socket.off('user:status_changed', onStatusChanged);
+      socket.off('drink:offer_incoming', onOfferIncoming);
+      socket.off('drink:offer_cancelled', onOfferCancelled);
+      socket.off('intervention:freeze', onInterventionFreeze);
+      socket.off('room:user_joined', onUserJoined);
+      socket.off('room:user_left', onUserLeft);
+    };
   }, [socket]);
 
-  // Bar Counter + Jukebox are fully handled inside PubFloorMap and never reach here
-  const handleHotspotClick = (hotspot) => {
-    setPendingHotspot(hotspot);
-  };
+  // ── Hotspot / entry handlers ───────────────────────────────────────────────
+  const handleHotspotClick = (hotspot) => setPendingHotspot(hotspot);
 
   const handleEntryConfirm = () => {
     const hotspot = pendingHotspot;
     setPendingHotspot(null);
-
     if (WASHROOM_TYPES.has(hotspot.type)) {
-      // Emit table:join for status tracking — no chatbox opens
-      if (activeTable) setActiveTable(null); // leave current table visually
-      socket?.emit('table:join', {
-        table_id: hotspot.id,
-        table_type: hotspot.type,
-        table_name: hotspot.name,
-      }, ({ error }) => {
-        if (error) addToast(error, 'error');
-        // myStatus will update via user:status_changed → 'eating_sandwich'
-      });
+      if (activeTable) setActiveTable(null);
+      socket?.emit('table:join', { table_id: hotspot.id, table_type: hotspot.type, table_name: hotspot.name },
+        ({ error }) => { if (error) addToast(error, 'error'); });
     } else {
       setActiveTable(hotspot);
+      setRoomUsers([]);
     }
   };
 
-  const handleLeaveTable = () => {
-    setActiveTable(null);
-    socket?.emit('table:leave');
+  const handleLeaveTable = () => { setActiveTable(null); setRoomUsers([]); socket?.emit('table:leave'); };
+  const handleLeaveWashroom = () => { socket?.emit('table:leave'); setMyStatus('active'); };
+
+  // ── Wingman accept / decline ───────────────────────────────────────────────
+  const acceptOffer = () => {
+    if (!socket || !pendingOffer) return;
+    socket.emit('drink:offer_accept', { offer_id: pendingOffer.offer_id }, (res) => {
+      if (res.error) addToast(res.error, 'error');
+      else { updateUser({ offered_inventory: res.offered_inventory ?? user?.offered_inventory }); addToast('🍻 Round accepted!', 'success'); }
+    });
+    setPendingOffer(null);
+  };
+  const declineOffer = () => {
+    if (!socket || !pendingOffer) return;
+    socket.emit('drink:offer_decline', { offer_id: pendingOffer.offer_id }, () => {});
+    setPendingOffer(null);
   };
 
-  const handleLeaveWashroom = () => {
-    socket?.emit('table:leave');
-    setMyStatus('active');
-  };
+  const TABS = [{ id: 'chat', label: '💬 Chat' }, { id: 'map', label: '🗺 Floor' }, { id: 'coaster', label: '🧾 Coaster' }];
 
-  const TABS = [
-    { id: 'chat',    label: '💬 Chat' },
-    { id: 'map',     label: '🗺 Floor' },
-    { id: 'coaster', label: '🧾 Coaster' },
-  ];
+  const floorMap = (
+    <PubFloorMap onHotspotClick={handleHotspotClick} roomCounts={roomCounts}
+      activeTableId={activeTable?.id} addToast={addToast} onBarOpen={() => setBarMenuOpen(true)} />
+  );
+  const chatPanel = activeTable
+    ? <TableChatbox table={activeTable} onLeave={handleLeaveTable} addToast={addToast} userStatuses={userStatuses} />
+    : <GeneralChat socket={socket} />;
+  const coasterPanel = <DrinkCoaster roomUsers={roomUsers} addToast={addToast} />;
 
   return (
-    <div className="h-screen flex flex-col bg-[#0a0d07] overflow-hidden">
+    <div className={`h-screen flex flex-col bg-[#0a0d07] overflow-hidden ${isShaking ? 'screen-shake' : ''}`}>
 
-      {/* ── Top bar ──────────────────────────────────────────────────────────── */}
-      <header
-        className="flex items-center justify-between px-4 py-2 flex-shrink-0 z-20"
-        style={{ borderBottom: '1px solid rgba(180,120,40,0.2)', background: '#0d0f08' }}
-      >
+      {/* ── Topbar ──────────────────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-4 py-2 flex-shrink-0 z-20"
+        style={{ borderBottom: '1px solid rgba(180,120,40,0.2)', background: '#0d0f08' }}>
         <div className="flex items-center gap-2">
           <span className="text-amber-400 font-bold text-sm tracking-wide">MacLaren's Pub</span>
-          <span
-            className={`w-1.5 h-1.5 rounded-full transition-colors ${connected ? 'bg-green-500' : 'bg-red-500'}`}
-            title={connected ? 'Connected' : 'Disconnected'}
-          />
+          <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
         </div>
-
         <div className="flex items-center gap-3">
-          {/* Status pill — only visible when not 'active' */}
           {myStatus !== 'active' && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-              style={{ background: 'rgba(255,216,0,0.12)', border: '1px solid rgba(255,216,0,0.3)', color: '#FFD800' }}
-            >
+              style={{ background: 'rgba(255,216,0,0.12)', border: '1px solid rgba(255,216,0,0.3)', color: '#FFD800' }}>
               <span>
-                {myStatus === 'idle' || myStatus === 'eating_sandwich' ? '🥪 Eating a sandwich' : ''}
-                {myStatus === 'waiting' ? '⏳ Waiting at entrance' : ''}
+                {(myStatus === 'idle' || myStatus === 'eating_sandwich') && '🥪 Eating a sandwich'}
+                {myStatus === 'waiting' && '⏳ Waiting at entrance'}
               </span>
               {(myStatus === 'idle' || myStatus === 'eating_sandwich') && (
-                <button
-                  onClick={handleLeaveWashroom}
-                  className="ml-1 text-white/40 hover:text-white/80 leading-none transition-colors"
-                  title="Leave washroom"
-                >✕</button>
+                <button onClick={handleLeaveWashroom} className="ml-1 text-white/40 hover:text-white/80" title="Leave washroom">✕</button>
               )}
             </div>
           )}
-          <span className="text-amber-400/60 text-xs hidden sm:block">
-            🪙 {user?.gnb_coin_balance ?? 0}
-          </span>
+          <span className="text-amber-400/60 text-xs hidden sm:block">🪙 {user?.gnb_coin_balance ?? 0}</span>
           <span className="text-white/50 text-xs hidden sm:block">{user?.display_name}</span>
-          <button
-            onClick={() => setPlaybookOpen(true)}
-            className="text-amber-400/60 hover:text-amber-400 text-sm transition-colors"
-            title="The Playbook"
-          >
-            📖
-          </button>
+          <button onClick={() => setPlaybookOpen(true)} className="text-amber-400/60 hover:text-amber-400 text-sm transition-colors" title="The Playbook">📖</button>
         </div>
       </header>
 
-      {/* ── Desktop layout (md+): floor map | chat | coaster ─────────────────── */}
+      {/* ── Intervention freeze overlay ──────────────────────────────────────── */}
+      {isFrozen && (
+        <div className="fixed inset-0 z-[55] pointer-events-none">
+          <div className="absolute inset-0 bg-red-900/15 animate-pulse" />
+        </div>
+      )}
+
+      {/* ── Desktop (md+): 3-column ──────────────────────────────────────────── */}
       <div className="hidden md:flex flex-1 overflow-hidden">
-        {/* Floor map */}
-        <div className="flex-1 overflow-hidden" style={{ borderRight: '1px solid rgba(180,120,40,0.15)' }}>
-          <PubFloorMap
-            onHotspotClick={handleHotspotClick}
-            roomCounts={roomCounts}
-            activeTableId={activeTable?.id}
-            addToast={addToast}
-          />
-        </div>
-
-        {/* Chat panel — general or table */}
-        <div className="w-[320px] flex flex-col overflow-hidden flex-shrink-0" style={{ borderRight: '1px solid rgba(180,120,40,0.15)' }}>
-          {activeTable ? (
-            <TableChatbox
-              table={activeTable}
-              onLeave={handleLeaveTable}
-              addToast={addToast}
-              userStatuses={userStatuses}
-            />
-          ) : (
-            <GeneralChat socket={socket} user={user} />
-          )}
-        </div>
-
-        {/* Coaster */}
-        <div className="w-[160px] overflow-hidden flex-shrink-0">
-          <CoasterPlaceholder />
-        </div>
+        <div className="flex-1 overflow-hidden" style={{ borderRight: '1px solid rgba(180,120,40,0.15)' }}>{floorMap}</div>
+        <div className="w-[320px] flex-shrink-0 overflow-hidden" style={{ borderRight: '1px solid rgba(180,120,40,0.15)' }}>{chatPanel}</div>
+        <div className="w-[200px] flex-shrink-0 overflow-hidden">{coasterPanel}</div>
       </div>
 
-      {/* ── Mobile layout (<md): tab interface ───────────────────────────────── */}
+      {/* ── Mobile: tabs ──────────────────────────────────────────────────────── */}
       <div className="flex md:hidden flex-1 flex-col overflow-hidden">
-        {/* Tab content */}
         <div className="flex-1 overflow-hidden">
-          {mobileTab === 'chat' && (
-            activeTable
-              ? <TableChatbox table={activeTable} onLeave={handleLeaveTable} addToast={addToast} />
-              : <GeneralChat socket={socket} user={user} />
-          )}
-          {mobileTab === 'map' && (
-            <PubFloorMap
-              onHotspotClick={handleHotspotClick}
-              roomCounts={roomCounts}
-              activeTableId={activeTable?.id}
-              addToast={addToast}
-            />
-          )}
-          {mobileTab === 'coaster' && <CoasterPlaceholder />}
+          {mobileTab === 'chat' && chatPanel}
+          {mobileTab === 'map' && floorMap}
+          {mobileTab === 'coaster' && coasterPanel}
         </div>
-
-        {/* Bottom tab bar */}
-        <div
-          className="flex flex-shrink-0"
-          style={{ borderTop: '1px solid rgba(180,120,40,0.2)', background: '#0d0f08' }}
-        >
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setMobileTab(tab.id)}
+        <div className="flex flex-shrink-0" style={{ borderTop: '1px solid rgba(180,120,40,0.2)', background: '#0d0f08' }}>
+          {TABS.map(tab => (
+            <button key={tab.id} onClick={() => setMobileTab(tab.id)}
               className="flex-1 py-3 text-xs font-medium transition-colors"
-              style={{
-                color: mobileTab === tab.id ? '#FFD800' : 'rgba(255,255,255,0.3)',
-                borderTop: mobileTab === tab.id ? '2px solid #FFD800' : '2px solid transparent',
-              }}
-            >
+              style={{ color: mobileTab === tab.id ? '#FFD800' : 'rgba(255,255,255,0.3)', borderTop: mobileTab === tab.id ? '2px solid #FFD800' : '2px solid transparent' }}>
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── Modals & overlays ─────────────────────────────────────────────────── */}
-      <EntryModal
-        hotspot={pendingHotspot}
-        onConfirm={handleEntryConfirm}
-        onCancel={() => setPendingHotspot(null)}
-      />
-      <ThePlaybook isOpen={playbookOpen} onClose={() => setPlaybookOpen(false)} />
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      <EntryModal hotspot={pendingHotspot} onConfirm={handleEntryConfirm} onCancel={() => setPendingHotspot(null)} />
+      <ThePlaybook isOpen={playbookOpen} onClose={() => setPlaybookOpen(false)} addToast={addToast} triggerShake={triggerShake} />
+      <BarMenuModal isOpen={barMenuOpen && !isFrozen} onClose={() => setBarMenuOpen(false)} addToast={addToast} triggerShake={triggerShake} triggerFreeze={triggerFreeze} />
+      <WingmanModal offer={pendingOffer} onAccept={acceptOffer} onDecline={declineOffer} />
       <Toast toasts={toasts} removeToast={removeToast} />
     </div>
   );
