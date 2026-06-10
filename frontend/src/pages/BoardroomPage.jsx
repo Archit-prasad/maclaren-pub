@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
+import { useToast } from '../hooks/useToast';
+import Toast from '../components/Toast';
 
 const API = (path, token) => ({ headers: { Authorization: `Bearer ${token}` }, url: `/api/admin${path}` });
 
@@ -289,14 +291,38 @@ export default function BoardroomPage() {
   const { user, token } = useAuth();
   const { socket } = useSocket();
   const navigate = useNavigate();
+  const { toasts, addToast, removeToast } = useToast();
   const [tab, setTab] = useState('ledger');
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!token) { navigate('/login', { replace: true }); return; }
-    if (user && !user.is_admin) { navigate('/', { replace: true }); }
-  }, [user, token]);
+    // If no token, go to login
+    if (!token) {
+      navigate('/login', { replace: true });
+      return;
+    }
+    // If user loaded and not admin, redirect with toast
+    if (user && !user.is_admin) {
+      addToast('Access denied. Admins only.', 'error');
+      setRedirecting(true);
+      setTimeout(() => navigate('/pub', { replace: true }), 1500);
+    }
+  }, [user, token, navigate]);
 
-  if (!user?.is_admin) return null;
+  // Show loading/redirect state while checking
+  if (!user || redirecting) {
+    return (
+      <div className="h-screen w-screen bg-[#080a05] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-white/40 text-sm">Loading...</p>
+          <Toast toasts={toasts} removeToast={removeToast} />
+        </div>
+      </div>
+    );
+  }
+
+  // Only render if admin
+  if (!user.is_admin) return null;
 
   return (
     <div className="min-h-screen bg-[#080a05] text-white">
@@ -319,6 +345,8 @@ export default function BoardroomPage() {
         {tab === 'grinch' && <GrinchTab token={token} />}
         {tab === 'intervention' && <InterventionTab token={token} socket={socket} />}
       </div>
+
+      <Toast toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }
