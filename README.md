@@ -1,5 +1,5 @@
 # MacLaren's Pub 🍺
-<img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDFpNDFrZW4xM2pzNDJicmJ0a2hsamw1bG0wdWJ5dnJhZTUzaW1iOCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/B0yP8p6NSfboY/giphy.gif" width="100%" alt="HIMYM">
+<img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDFpNDFrZW4xM2pzNDJicmJ0a2hsamw1bG0wdWJ5dnJhZTUzaW1iOCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/B0yP8p6NSfboY/giphy.gif" width="100%" height="20%" alt="HIMYM">
 A gamified, real-time social chat application themed around the iconic MacLaren's Pub from *How I Met Your Mother*.
 
 ## 🎯 Overview
