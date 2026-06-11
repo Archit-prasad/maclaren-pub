@@ -74,7 +74,7 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
     if (RESERVED_USERNAMES.some(reserved => display_name.includes(reserved)))
       return res.status(400).json({ message: 'This username is reserved for members of the main booth. Try another one, bro.' });
 
-    const existing = await User.findOne({ $or: [{ email }, { display_name }] });
+    const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { display_name }] });
     if (existing) {
       if (existing.email === email.toLowerCase())
         return res.status(409).json({ message: 'Email already taken.' });
@@ -82,7 +82,8 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 12);
-    const user = await User.create({ display_name, age: ageNum, gender, email, password_hash });
+    const isAdmin = !!(process.env.ADMIN_EMAIL && email.toLowerCase() === process.env.ADMIN_EMAIL.trim().toLowerCase());
+    const user = await User.create({ display_name, age: ageNum, gender, email, password_hash, is_admin: isAdmin });
 
     if (req.file) {
       try {
@@ -107,16 +108,22 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = (req.body.email ?? '').trim().toLowerCase();
+    const { password } = req.body;
     if (!email || !password)
       return res.status(400).json({ message: 'Email and password are required.' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: 'Invalid credentials.' });
     if (user.is_banned) return res.status(403).json({ message: "🚪 Doug the Bouncer threw you out into the alley. Your account has been permanently banned.", banned: true });
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials.' });
+
+    // Auto-promote to admin if ADMIN_EMAIL env var matches
+    if (process.env.ADMIN_EMAIL && email === process.env.ADMIN_EMAIL.trim().toLowerCase() && !user.is_admin) {
+      user.is_admin = true;
+    }
 
     user.session_overdraft_count = 0;
     user.session_spend_total = 0;

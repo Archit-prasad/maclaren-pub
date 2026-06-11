@@ -41,7 +41,12 @@ function FloatingInput({ id, label, type = 'text', value, onChange, autoComplete
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, token } = useAuth();
+
+  // Already logged in — skip straight to the pub
+  useEffect(() => {
+    if (token) navigate('/pub', { replace: true });
+  }, [token, navigate]);
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [fields, setFields] = useState({
     display_name: '', age: '', gender: '', email: '', password: '', confirmPassword: '',

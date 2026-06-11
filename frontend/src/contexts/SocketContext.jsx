@@ -4,8 +4,6 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = import.meta.env.VITE_BACKEND_URL ?? '';
-
 export function SocketProvider({ children }) {
   const { token, user } = useAuth();
   const socketRef = useRef(null);
@@ -13,6 +11,8 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     if (!token) return;
+    // Use VITE_BACKEND_URL if provided, otherwise use current window location for same-origin requests
+    const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || window.location.origin;
     const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],

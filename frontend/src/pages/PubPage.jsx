@@ -400,6 +400,11 @@ export default function PubPage() {
             🪙 {user?.gnb_coin_balance ?? 0}
           </span>
           <span className="text-white/50 text-xs hidden sm:block">{user?.display_name}</span>
+          {/* Admin boardroom link */}
+          {user?.is_admin && (
+            <button onClick={() => navigate('/boardroom')} className="text-sm transition-colors hover:scale-110" title="The Boardroom"
+              style={{ color: bfhLocked ? 'rgba(102,153,255,0.7)' : 'rgba(251,191,36,0.6)' }}>🏛️</button>
+          )}
           {/* BFH button */}
           <button onClick={() => setBfhPanelOpen(true)} className="text-lg transition-colors hover:scale-110" title="Blue French Horn Protocol">🎺</button>
           <button onClick={() => setPlaybookOpen(true)} className="text-sm transition-colors" title="The Playbook"
