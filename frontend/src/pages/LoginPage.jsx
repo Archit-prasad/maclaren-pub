@@ -44,7 +44,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [fields, setFields] = useState({
-    display_name: '', gender: '', email: '', password: '', confirmPassword: '',
+    display_name: '', age: '', gender: '', email: '', password: '', confirmPassword: '',
   });
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -115,6 +115,7 @@ export default function LoginPage() {
       } else {
         data = await registerUser({
           display_name: fields.display_name,
+          age: fields.age,
           gender: fields.gender,
           email: fields.email,
           password: fields.password,
@@ -271,6 +272,8 @@ export default function LoginPage() {
             </div>
 
             <FloatingInput id="display_name" label="Username" value={fields.display_name} onChange={set('display_name')} />
+
+            <FloatingInput id="age" label="Age" type="number" value={fields.age} onChange={set('age')} />
 
             {/* Gender dropdown */}
             <div className="relative mb-5">

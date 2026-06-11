@@ -76,6 +76,12 @@ module.exports = function registerPhase4Events(socket, io, state) {
         return callback({ error: 'Please set your gender in The Playbook settings to use this feature.' });
       if (sender.gender === recipient.gender)
         return callback({ error: 'Error: The Blue French Horn is strictly reserved for cross-gender, over-the-top grand romantic gestures.' });
+
+      // Check if recipient is in sender's bro registry
+      const recipientIsBro = sender.bro_registry.some(broId => String(broId) === String(recipient_user_id));
+      if (recipientIsBro)
+        return callback({ error: 'Bros Before Hoes: You cannot send the Blue French Horn to your Bro. The romance protocol only works if you are not officially Bros.' });
+
       if (recipient.last_horn_received_at && Date.now() - recipient.last_horn_received_at < 90 * 86400000)
         return callback({ error: 'Transaction Blocked: The Platinum Rule dictates this user is on a 3-month romantic cooldown period.' });
       if (sender.gnb_coin_balance < 2000)

@@ -45,26 +45,44 @@ function userPayload(user) {
   };
 }
 
+// Reserved usernames check
+const RESERVED_USERNAMES = ['TedMosby', 'RobinScherbatsky', 'BarneyStinson', 'MarshallEriksen', 'LilyAldrin'];
+
 // POST /api/auth/register
 router.post('/register', upload.single('avatar'), async (req, res) => {
   try {
-    const { display_name, gender, email, password } = req.body;
+    const { display_name, age, gender, email, password } = req.body;
 
-    if (!display_name || !gender || !email || !password)
+    if (!display_name || age === undefined || !gender || !email || !password)
       return res.status(400).json({ message: 'All fields are required.' });
+
+    const ageNum = parseInt(age, 10);
+    if (isNaN(ageNum) || ageNum < 20)
+      return res.status(400).json({ message: 'Ted Mosby will meet you outside the pub.' });
+
     if (!['Male', 'Female'].includes(gender))
       return res.status(400).json({ message: 'Gender must be Male or Female.' });
     if (password.length < 6)
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
 
+    // Username validation
+    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (!usernameRegex.test(display_name))
+      return res.status(400).json({ message: 'We all have read the playbook!!' });
+
+    // Check for reserved usernames
+    if (RESERVED_USERNAMES.some(reserved => display_name.includes(reserved)))
+      return res.status(400).json({ message: 'This username is reserved for members of the main booth. Try another one, bro.' });
+
     const existing = await User.findOne({ $or: [{ email }, { display_name }] });
     if (existing) {
-      const field = existing.email === email.toLowerCase() ? 'Email' : 'Display name';
-      return res.status(409).json({ message: `${field} already taken.` });
+      if (existing.email === email.toLowerCase())
+        return res.status(409).json({ message: 'Email already taken.' });
+      return res.status(409).json({ message: 'We all have read the playbook!!' });
     }
 
     const password_hash = await bcrypt.hash(password, 12);
-    const user = await User.create({ display_name, gender, email, password_hash });
+    const user = await User.create({ display_name, age: ageNum, gender, email, password_hash });
 
     if (req.file) {
       try {

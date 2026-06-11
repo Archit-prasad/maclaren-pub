@@ -13,11 +13,12 @@ const transactionSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
   display_name:    { type: String, required: true, unique: true, trim: true },
+  age:             { type: Number, required: true },
   gender:          { type: String, enum: ['Male', 'Female'], required: true },
   email:           { type: String, required: true, unique: true, lowercase: true, trim: true },
   password_hash:   { type: String, required: true },
   avatar_url:      { type: String, default: '' },
-  gnb_coin_balance: { type: Number, default: 500 },
+  gnb_coin_balance: { type: Number, default: 100 },
   bro_registry: {
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     validate: { validator: v => v.length <= 50, message: 'Bro Registry max 50' },

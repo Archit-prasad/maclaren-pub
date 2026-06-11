@@ -2,9 +2,10 @@ import axios from 'axios';
 
 const BASE = import.meta.env.VITE_BACKEND_URL || '';
 
-export async function registerUser({ display_name, gender, email, password, avatarFile }) {
+export async function registerUser({ display_name, age, gender, email, password, avatarFile }) {
   const form = new FormData();
   form.append('display_name', display_name);
+  form.append('age', age);
   form.append('gender', gender);
   form.append('email', email);
   form.append('password', password);
