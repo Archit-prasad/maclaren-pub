@@ -22,7 +22,26 @@ const { loadKeywords, censorText } = require('./middleware/grinchFilter');
 const app = express();
 const httpServer = http.createServer(app);
 
-app.use(cors(corsConfig));
+app.use(cors({
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
+      'https://maclaren-pub.vercel.app'
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS not allowed'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
