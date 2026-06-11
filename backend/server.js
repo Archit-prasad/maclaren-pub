@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 
+const corsConfig = require('./config/cors');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
 const coinsRoutes = require('./routes/coins');
@@ -21,18 +22,7 @@ const { loadKeywords, censorText } = require('./middleware/grinchFilter');
 const app = express();
 const httpServer = http.createServer(app);
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173',
-  process.env.VERCEL_FRONTEND_URL,
-].filter(Boolean);
-
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error('CORS: origin not allowed'));
-  },
-  credentials: true,
-}));
+app.use(cors(corsConfig));
 app.use(express.json({ limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
@@ -181,7 +171,7 @@ setInterval(async () => {
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
 const io = new Server(httpServer, {
-  cors: { origin: allowedOrigins, methods: ['GET', 'POST'], credentials: true },
+  cors: corsConfig,
 });
 global._io = io;
 
