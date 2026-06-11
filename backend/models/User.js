@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
   display_name:    { type: String, required: true, unique: true, trim: true },
-  age:             { type: Number, required: true },
+  age:             { type: Number, default: null },
   gender:          { type: String, enum: ['Male', 'Female'], required: true },
   email:           { type: String, required: true, unique: true, lowercase: true, trim: true },
   password_hash:   { type: String, required: true },
